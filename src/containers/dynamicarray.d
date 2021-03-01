@@ -7,8 +7,9 @@
 
 module containers.dynamicarray;
 
+private import containers.internal.util;
 private import containers.internal.node : shouldAddGCRange;
-private import stdx.allocator.mallocator : Mallocator;
+private import std.experimental.allocator.mallocator : Mallocator;
 
 /**
  * Array that is able to grow itself when items are appended to it. Uses
@@ -24,7 +25,7 @@ struct DynamicArray(T, Allocator = Mallocator, bool supportGC = shouldAddGCRange
 {
 	this(this) @disable;
 
-	private import stdx.allocator.common : stateSize;
+	private import std.experimental.allocator.common : stateSize;
 
 	static if (is(typeof((T[] a, const T[] b) => a[0 .. b.length] = b[0 .. $])))
 	{
@@ -61,7 +62,7 @@ struct DynamicArray(T, Allocator = Mallocator, bool supportGC = shouldAddGCRange
 
 	~this()
 	{
-		import stdx.allocator.mallocator : Mallocator;
+		import std.experimental.allocator.mallocator : Mallocator;
 		import containers.internal.node : shouldAddGCRange;
 
 		if (arr is null)
@@ -78,9 +79,14 @@ struct DynamicArray(T, Allocator = Mallocator, bool supportGC = shouldAddGCRange
 		static if (useGC)
 		{
 			import core.memory : GC;
-			GC.removeRange(arr.ptr);
+            assumePure((){
+			    GC.removeRange(arr.ptr);
+            })();
 		}
-		allocator.deallocate(arr);
+
+        ()@trusted{
+		    allocator.deallocate(arr);
+        }();
 	}
 
 	/// Slice operator overload
@@ -110,7 +116,7 @@ struct DynamicArray(T, Allocator = Mallocator, bool supportGC = shouldAddGCRange
 	 */
 	void insertBack(T value)
 	{
-		import stdx.allocator.mallocator : Mallocator;
+		import std.experimental.allocator.mallocator : Mallocator;
 		import containers.internal.node : shouldAddGCRange;
 
 		if (arr.length == 0)
@@ -418,6 +424,10 @@ private:
 	mixin AllocatorState!Allocator;
 	ContainerStorageType!(T)[] arr;
 	size_t l;
+}
+
+void test()@safe @nogc nothrow pure{
+    DynamicArray!long x;
 }
 
 version(emsi_containers_unittest) unittest
